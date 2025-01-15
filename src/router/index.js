@@ -1,8 +1,10 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 
 const router = createRouter({
-  history: createWebHashHistory('/chenzilong0828.github.io/'), // 使用 hash 模式
+  history: createWebHashHistory(),
   routes: [
     // 你的路由配置
   ]
-}) 
+})
+
+export default router 
