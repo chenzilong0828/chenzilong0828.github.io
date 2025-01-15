@@ -1,10 +1,10 @@
 const { defineConfig } = require('@vue/cli-service')
 const webpack = require('webpack')
 
-module.exports = {
+module.exports = defineConfig({
   publicPath: process.env.NODE_ENV === 'production'
-    ? '/chenzilong0828.github.io/'  // 替换成你的 GitHub 仓库名
-    : '/',
+    ? '/chenzilong0828.github.io/'  // 确保这里的路径正确
+    : '/chenzilong0828.github.io/',
   configureWebpack: {
     plugins: [
       new webpack.DefinePlugin({
@@ -48,4 +48,4 @@ module.exports = {
       },
     },
   }
-}
+})
