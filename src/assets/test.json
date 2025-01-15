@@ -1,0 +1,6 @@
+{
+  "temperature": 25,
+  "humidity": 60,
+  "isRaining": false,
+  "location": "Beijing"
+}
