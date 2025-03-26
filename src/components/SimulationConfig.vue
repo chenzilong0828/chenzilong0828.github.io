@@ -1,270 +1,168 @@
 <template>
-  <div id="particles-js"></div>
   <div class="container">
-    <div class="cyber-corner top-left"></div>
+    <el-button
+      class="back-button"
+      type="primary"
+      :icon="ArrowLeft"
+      @click="handleBack"
+      >返回</el-button
+    >
+    <!-- <div class="cyber-corner top-left"></div> -->
     <div class="cyber-corner top-right"></div>
     <div class="cyber-corner bottom-left"></div>
     <div class="cyber-corner bottom-right"></div>
     <div class="scan-lines"></div>
     <div class="glitch-wrapper">
       <h1 class="cyber-glitch" data-text="数据模拟配置界面">
-        数据模拟配置界面
+        {{ protocol }}数据模拟配置界面
       </h1>
       <div class="digital-rain"></div>
     </div>
     <el-tabs v-model="activeTab" type="border-card">
-      <el-tab-pane label="实时数据字段配置" name="field">
-        <FieldConfig v-if="activeTab === 'field'" />
+      <el-tab-pane v-if="protocol === 'tcp'" label="登录" name="login">
+        <TcpDefault
+          v-if="activeTab === 'login'"
+          :choiceType="protocol"
+          :tcpType="1"
+          @reset-protocol="handleResetProtocol"
+          @login-success="handleLoginSuccess"
+        />
       </el-tab-pane>
-      <el-tab-pane label="模拟事件数据配置" name="event">
-        <EventConfig v-if="activeTab === 'event'" />
+      <el-tab-pane
+        v-if="protocol === 'tcp'"
+        label="心跳"
+        name="heart"
+        :disabled="!isLoggedIn"
+      >
+        <TcpDefault
+          v-if="activeTab === 'heart'"
+          :choiceType="protocol"
+          :tcpType="2"
+          @reset-protocol="handleResetProtocol"
+        />
       </el-tab-pane>
-      <el-tab-pane label="模拟故障数据配置" name="fault">
-        <FaultConfig v-if="activeTab === 'fault'" />
+      <el-tab-pane
+        v-if="protocol === 'tcp'"
+        label="登出"
+        name="logout"
+        :disabled="!isLoggedIn"
+      >
+        <TcpDefault
+          v-if="activeTab === 'logout'"
+          :choiceType="protocol"
+          :tcpType="3"
+          @reset-protocol="handleResetProtocol"
+          @logout-success="handleLogout"
+        />
       </el-tab-pane>
-      <el-tab-pane label="模拟任务类型配置" name="task">
-        <TaskConfig v-if="activeTab === 'task'" />
+      <el-tab-pane
+        label="设备状态信息上报"
+        name="status"
+        :disabled="protocol === 'tcp' && !isLoggedIn"
+      >
+        <EquipmentStatus
+          v-if="activeTab === 'status'"
+          :choiceType="protocol"
+          @reset-protocol="handleResetProtocol"
+        />
+      </el-tab-pane>
+      <el-tab-pane
+        label="设备位置信息上报"
+        name="location"
+        :disabled="protocol === 'tcp' && !isLoggedIn"
+      >
+        <EquipmentLocation
+          v-if="activeTab === 'location'"
+          :choiceType="protocol"
+          @reset-protocol="handleResetProtocol"
+        />
+      </el-tab-pane>
+      <el-tab-pane
+        label="设备事件信息上报"
+        name="event"
+        :disabled="protocol === 'tcp' && !isLoggedIn"
+      >
+        <EquipmentEvent
+          v-if="activeTab === 'event'"
+          :choiceType="protocol"
+          @reset-protocol="handleResetProtocol"
+        />
+      </el-tab-pane>
+      <el-tab-pane
+        label="设备任务信息上报"
+        name="task"
+        :disabled="protocol === 'tcp' && !isLoggedIn"
+      >
+        <EquipmentTask
+          v-if="activeTab === 'task'"
+          :choiceType="protocol"
+          @reset-protocol="handleResetProtocol"
+        />
       </el-tab-pane>
     </el-tabs>
-    <div class="button-group">
-      <el-button class="custom-button glow start-btn" @click="startSimulation"
-        >开始模拟</el-button
-      >
-      <el-button class="custom-button warning" @click="stopSimulation"
-        >停止模拟</el-button
-      >
-    </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, nextTick } from "vue";
-import FieldConfig from "./FieldConfig.vue";
-import EventConfig from "./EventConfig.vue";
-import FaultConfig from "./FaultConfig.vue";
-import TaskConfig from "./TaskConfig.vue";
+import { ref } from "vue";
+import { ArrowLeft } from "@element-plus/icons-vue";
+import EquipmentStatus from "./EquipmentStatus.vue";
+import EquipmentLocation from "./EquipmentLocation.vue";
+import EquipmentEvent from "./EquipmentEvent.vue";
+import EquipmentTask from "./EquipmentTask.vue";
+import TcpDefault from "./tcpDefault.vue";
 import { ElTabs, ElTabPane, ElButton } from "element-plus";
-import "particles.js";
-import gsap from "gsap";
-import MouseFollower from "mouse-follower";
-
-// 将 GSAP 注册到 MouseFollower
-MouseFollower.registerGSAP(gsap);
 
 export default {
   name: "SimulationConfig",
   components: {
-    FieldConfig,
-    EventConfig,
-    FaultConfig,
-    TaskConfig,
+    EquipmentStatus,
+    EquipmentLocation,
+    EquipmentEvent,
+    EquipmentTask,
+    TcpDefault,
     ElTabs,
     ElTabPane,
     ElButton,
   },
-  setup() {
-    const activeTab = ref("field");
-    let cursor = null;
+  props: {
+    protocol: {
+      type: String,
+      required: true,
+      validator: (value) => ["http", "mqtt", "tcp"].includes(value),
+    },
+  },
+  emits: ["reset-protocol"],
+  setup(props, { emit }) {
+    const activeTab = ref(props.protocol === "tcp" ? "login" : "status");
+    const isLoggedIn = ref(false);
 
-    const startSimulation = () => {
-      console.log("Simulation started");
-      // 添加炫酷的开始动画
-      gsap
-        .timeline()
-        .to(".custom-button.glow", {
-          scale: 1.1,
-          duration: 0.2,
-        })
-        .to(".custom-button.glow", {
-          scale: 1,
-          duration: 0.1,
-        })
-        .to(".container", {
-          boxShadow: "0 0 50px rgba(0, 255, 255, 0.8)",
-          duration: 0.3,
-          yoyo: true,
-          repeat: 1,
-        });
+    const handleLoginSuccess = () => {
+      isLoggedIn.value = true;
     };
 
-    const stopSimulation = () => {
-      console.log("Simulation stopped");
-      // 添加停止动画
-      gsap
-        .timeline()
-        .to(".custom-button.warning", {
-          scale: 1.1,
-          duration: 0.2,
-        })
-        .to(".custom-button.warning", {
-          scale: 1,
-          duration: 0.1,
-        })
-        .to(".container", {
-          boxShadow: "0 0 50px rgba(255, 62, 62, 0.8)",
-          duration: 0.3,
-          yoyo: true,
-          repeat: 1,
-        });
+    const handleLogout = () => {
+      isLoggedIn.value = false;
+      activeTab.value = "login";
     };
 
-    onMounted(() => {
-      window.particlesJS("particles-js", {
-        particles: {
-          number: { value: 80, density: { enable: true, value_area: 800 } },
-          color: { value: "#ffffff" },
-          shape: { type: "circle" },
-          opacity: { value: 0.5, random: false },
-          size: { value: 3, random: true },
-          line_linked: {
-            enable: true,
-            distance: 150,
-            color: "#ffffff",
-            opacity: 0.4,
-            width: 1,
-          },
-          move: {
-            enable: true,
-            speed: 6,
-            direction: "none",
-            random: false,
-            straight: false,
-            out_mode: "out",
-            bounce: false,
-          },
-        },
-        interactivity: {
-          detect_on: "canvas",
-          events: {
-            onhover: { enable: true, mode: "repulse" },
-            onclick: { enable: true, mode: "push" },
-          },
-          modes: {
-            repulse: { distance: 100, duration: 0.4 },
-            push: { particles_nb: 4 },
-          },
-        },
-        retina_detect: true,
-      });
+    const handleResetProtocol = () => {
+      isLoggedIn.value = false;
+      emit("reset-protocol");
+    };
 
-      nextTick(() => {
-        cursor = new MouseFollower({
-          container: document.body,
-          speed: 0.7,
-          ease: "expo.out",
-          skewing: 2,
-          className: "mf-cursor",
-          innerClassName: "mf-cursor-inner",
-          textClassName: "mf-cursor-text",
-          mediaClassName: "mf-cursor-media",
-          mediaBoxClassName: "mf-cursor-media-box",
-          textStyle: {
-            color: "#000",
-            mixBlendMode: "normal",
-          },
-          stateDetection: {
-            "-pointer": "a,button,.el-button,.el-tabs__item",
-            "-hidden": "iframe",
-          },
-        });
-
-        const startBtn = document.querySelector(".start-btn");
-        if (startBtn) {
-          startBtn.addEventListener("mouseenter", () => {
-            cursor.setText("启动");
-            cursor.addState("-danger -lg");
-            gsap.to(startBtn, {
-              scale: 1.1,
-              duration: 0.3,
-              ease: "power2.out",
-            });
-          });
-
-          startBtn.addEventListener("mouseleave", () => {
-            cursor.removeText();
-            cursor.removeState("-danger -lg");
-            gsap.to(startBtn, {
-              scale: 1,
-              duration: 0.3,
-              ease: "power2.out",
-            });
-          });
-        }
-      });
-
-      // 为标题添加特效
-      const title = document.querySelector("h1");
-      title.addEventListener("mouseenter", () => {
-        cursor.setText("汉特云");
-        cursor.addState("-danger -lg");
-      });
-      title.addEventListener("mouseleave", () => {
-        cursor.removeText();
-        cursor.removeState("-danger -lg");
-      });
-
-      // 为按钮添加特效
-      const stopBtn = document.querySelector(".custom-button.warning");
-      stopBtn.addEventListener("mouseenter", () => {
-        cursor.setText("停止");
-        cursor.addState("-danger -lg");
-      });
-      stopBtn.addEventListener("mouseleave", () => {
-        cursor.removeText();
-        cursor.removeState("-danger -lg");
-      });
-
-      // 添加页面载入动画
-      const tl = gsap.timeline();
-
-      tl.from(".container", {
-        y: 50,
-        opacity: 0,
-        duration: 1,
-        ease: "power3.out",
-      })
-        .from(
-          "h1",
-          {
-            y: -20,
-            opacity: 0,
-            duration: 0.7,
-            ease: "back.out(1.7)",
-          },
-          "-=0.5"
-        )
-        .from(
-          ".el-tabs",
-          {
-            opacity: 0,
-            scale: 0.95,
-            duration: 0.5,
-            ease: "power2.out",
-          },
-          "-=0.3"
-        )
-        .from(
-          ".button-group",
-          {
-            y: 20,
-            opacity: 0,
-            duration: 0.5,
-            ease: "power2.out",
-          },
-          "-=0.2"
-        );
-    });
-
-    onUnmounted(() => {
-      if (cursor) {
-        cursor.destroy();
-      }
-    });
+    const handleBack = () => {
+      emit("reset-protocol");
+    };
 
     return {
       activeTab,
-      startSimulation,
-      stopSimulation,
+      isLoggedIn,
+      handleBack,
+      ArrowLeft,
+      handleResetProtocol,
+      handleLoginSuccess,
+      handleLogout,
     };
   },
 };
@@ -297,7 +195,7 @@ body {
   padding: 40px;
   box-shadow: 0 0 30px rgba(0, 255, 255, 0.15),
     inset 0 0 20px rgba(0, 255, 255, 0.05);
-  margin: 40px auto;
+  margin: 0px auto;
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(0, 255, 255, 0.2);
@@ -310,7 +208,7 @@ body {
 }
 
 .glitch-wrapper {
-  margin-bottom: 20px;
+  margin-top: 20px;
 }
 
 .cyber-glitch {
@@ -320,144 +218,7 @@ body {
   font-weight: bold;
   text-transform: uppercase;
   position: relative;
-  text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75),
-    -0.025em -0.05em 0 rgba(0, 255, 0, 0.75),
-    0.025em 0.05em 0 rgba(0, 0, 255, 0.75);
-  animation: glitch 500ms infinite;
-}
-
-.cyber-glitch::before,
-.cyber-glitch::after {
-  content: attr(data-text);
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.cyber-glitch::before {
-  animation: cyber-glitch-1 2s infinite;
-  clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%);
-  transform: translate(-0.025em, -0.0125em);
-  opacity: 0.75;
-}
-
-.cyber-glitch::after {
-  animation: cyber-glitch-2 2s infinite;
-  clip-path: polygon(0 80%, 100% 20%, 100% 100%, 0 100%);
-  transform: translate(0.025em, 0.025em);
-  opacity: 0.75;
-}
-
-@keyframes cyber-glitch-1 {
-  0% {
-    transform: none;
-    opacity: 0.75;
-  }
-  7% {
-    transform: translate(2px, 3px);
-    opacity: 0.75;
-  }
-  10% {
-    transform: none;
-    opacity: 0.75;
-  }
-  27% {
-    transform: none;
-    opacity: 0.75;
-  }
-  30% {
-    transform: translate(5px, 2px);
-    opacity: 0.75;
-  }
-  35% {
-    transform: none;
-    opacity: 0.75;
-  }
-  52% {
-    transform: none;
-    opacity: 0.75;
-  }
-  55% {
-    transform: translate(5px, 1px);
-    opacity: 0.75;
-  }
-  50% {
-    transform: none;
-    opacity: 0.75;
-  }
-  72% {
-    transform: none;
-    opacity: 0.75;
-  }
-  75% {
-    transform: translate(2px, 6px);
-    opacity: 0.75;
-  }
-  80% {
-    transform: none;
-    opacity: 0.75;
-  }
-  100% {
-    transform: none;
-    opacity: 0.75;
-  }
-}
-
-@keyframes cyber-glitch-2 {
-  0% {
-    transform: none;
-    opacity: 0.25;
-  }
-  7% {
-    transform: translate(-2px, -3px);
-    opacity: 0.25;
-  }
-  10% {
-    transform: none;
-    opacity: 0.25;
-  }
-  27% {
-    transform: none;
-    opacity: 0.25;
-  }
-  30% {
-    transform: translate(-5px, -2px);
-    opacity: 0.25;
-  }
-  35% {
-    transform: none;
-    opacity: 0.25;
-  }
-  52% {
-    transform: none;
-    opacity: 0.25;
-  }
-  55% {
-    transform: translate(-5px, -1px);
-    opacity: 0.25;
-  }
-  50% {
-    transform: none;
-    opacity: 0.25;
-  }
-  72% {
-    transform: none;
-    opacity: 0.25;
-  }
-  75% {
-    transform: translate(-2px, -6px);
-    opacity: 0.25;
-  }
-  80% {
-    transform: none;
-    opacity: 0.25;
-  }
-  100% {
-    transform: none;
-    opacity: 0.25;
-  }
+  margin: 20px 0;
 }
 
 .input-group {
@@ -588,16 +349,6 @@ body {
   animation: glow 2s infinite;
 }
 
-#particles-js {
-  position: fixed;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  z-index: -1;
-  background: linear-gradient(45deg, #0f0c29, #302b63, #24243e);
-}
-
 .button-group {
   margin-top: 30px;
   display: flex;
@@ -644,77 +395,6 @@ h1.glow {
     0 0 30px rgba(0, 255, 255, 0.1);
 }
 
-/* 添加鼠标跟随样式 */
-:deep(.mf-cursor) {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 250;
-  contain: layout style size;
-  pointer-events: none;
-  will-change: transform;
-}
-
-:deep(.mf-cursor-inner) {
-  position: absolute;
-  top: -4px;
-  left: -4px;
-  transform: translate(var(--mouse-x), var(--mouse-y));
-  width: 8px;
-  height: 8px;
-  background: rgba(0, 255, 255, 0.8);
-  border-radius: 50%;
-  transition: width 0.2s, height 0.2s, opacity 0.2s;
-}
-
-:deep(.mf-cursor.-inverse .mf-cursor-inner) {
-  color: #000;
-  background: #fff;
-  mix-blend-mode: difference;
-}
-
-:deep(.mf-cursor.-danger .mf-cursor-inner) {
-  background: #ff3e3e;
-}
-
-:deep(.mf-cursor.-lg .mf-cursor-inner) {
-  width: 32px;
-  height: 32px;
-}
-
-:deep(.mf-cursor-text) {
-  position: absolute;
-  top: -18px;
-  left: -18px;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform: translate(var(--mouse-x), var(--mouse-y));
-  color: #fff;
-  font-size: 12px;
-  font-weight: 500;
-  opacity: 0;
-  transition: opacity 0.4s;
-}
-
-:deep(.mf-cursor.-text .mf-cursor-text) {
-  opacity: 1;
-}
-
-:deep(.mf-cursor.-text.-inverse .mf-cursor-text) {
-  color: #000;
-  font-weight: bold;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-
-:deep(.mf-cursor.-text.-danger .mf-cursor-text) {
-  color: #ff3e3e;
-}
-
 /* 添加角标装饰 */
 .cyber-corner {
   position: absolute;
@@ -725,8 +405,8 @@ h1.glow {
 }
 
 .cyber-corner.top-left {
-  top: 10px;
-  left: 10px;
+  top: 50px;
+  left: 50px;
   border-right: none;
   border-bottom: none;
 }
@@ -848,13 +528,34 @@ h1.glow {
   }
 }
 
-/* 优化按钮样式 */
-.custom-button {
-  position: relative;
+/* 美化返回按钮样式 */
+.back-button {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  z-index: 2;
+  background: transparent;
+  border: 1px solid #0ff;
+  color: #0ff;
+  padding: 8px 20px;
+  font-family: "Orbitron", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
   overflow: hidden;
 }
 
-.custom-button::before {
+.back-button:hover {
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3),
+    inset 0 0 10px rgba(0, 255, 255, 0.2);
+}
+
+.back-button:active {
+  transform: scale(0.95);
+}
+
+.back-button::before {
   content: "";
   position: absolute;
   top: 0;
@@ -864,27 +565,13 @@ h1.glow {
   background: linear-gradient(
     120deg,
     transparent,
-    rgba(0, 255, 255, 0.2),
+    rgba(0, 255, 255, 0.3),
     transparent
   );
   transition: 0.5s;
 }
 
-.custom-button:hover::before {
+.back-button:hover::before {
   left: 100%;
-}
-
-/* 添加霓虹文字效果 */
-.el-tabs__item {
-  transition: text-shadow 0.3s;
-}
-
-.el-tabs__item:hover {
-  text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
-}
-
-/* 确保容器可以显示所有效果 */
-.container {
-  overflow: visible !important;
 }
 </style> 

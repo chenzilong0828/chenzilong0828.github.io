@@ -3,17 +3,16 @@
     <json-editor
       ref="jsonEditorRef"
       v-model="localValue"
-      mode="code"
+      :mode="editorMode"
       lang="zh"
       :options="editorOptions"
       class="json-editor"
-      @change="handleChange"
     />
   </div>
 </template>
 
 <script>
-import { ref, watch, onMounted, nextTick } from "vue";
+import { ref, onMounted, nextTick, computed } from "vue";
 import JsonEditor from "vue-json-editor";
 
 export default {
@@ -34,6 +33,15 @@ export default {
       type: Object,
       default: () => ({}),
     },
+    readOnly: {
+      type: Boolean,
+      default: false,
+    },
+    mode: {
+      type: String,
+      default: "code",
+      validator: (value) => ["code", "view", "tree"].includes(value),
+    },
   },
   emits: ["update:modelValue", "change", "error"],
   setup(props, { emit }) {
@@ -41,15 +49,26 @@ export default {
     const localValue = ref(props.modelValue);
 
     const defaultOptions = {
-      modes: ["code", "tree"],
+      mode: "code",
+      modes: ["code"],
       mainMenuBar: false,
       statusBar: false,
+      search: false,
+      enableSort: false,
+      enableTransform: false,
     };
 
-    const editorOptions = {
+    const editorOptions = computed(() => ({
       ...defaultOptions,
       ...props.options,
-    };
+      readOnly: props.readOnly,
+      indentation: 2,
+    }));
+
+    const editorMode = computed(() => {
+      // 即使在只读模式下也保持 code 显示方式
+      return "code";
+    });
 
     // 格式化 JSON 数据
     const formatValue = (value) => {
@@ -65,38 +84,42 @@ export default {
       return value;
     };
 
-    // 监听外部值变化
-    watch(
-      () => props.modelValue,
-      (newVal) => {
-        localValue.value = formatValue(newVal);
-      },
-      { immediate: true }
-    );
-
-    // 处理编辑器值变化
-    const handleChange = (value) => {
-      try {
-        const parsedValue =
-          typeof value === "string" ? JSON.parse(value) : value;
-        emit("update:modelValue", parsedValue);
-        emit("change", parsedValue);
-      } catch (error) {
-        console.warn("JSON parse error:", error);
-        emit("error", error);
-      }
-    };
-
     onMounted(() => {
       nextTick(() => {
         if (jsonEditorRef.value?.editor) {
-          // 初始化时设置一个有效的 JSON
+          const editor = jsonEditorRef.value.editor;
           const initialValue = formatValue(props.modelValue);
-          jsonEditorRef.value.editor.set(initialValue);
-          jsonEditorRef.value.editor.format();
+          editor.set(initialValue);
+
+          if (editor.aceEditor) {
+            // 只在编辑器失焦时触发更新
+            editor.aceEditor.on("blur", () => {
+              try {
+                const value = editor.get();
+                const parsedValue =
+                  typeof value === "string" ? JSON.parse(value) : value;
+                if (typeof parsedValue === "object" && parsedValue !== null) {
+                  emit("update:modelValue", parsedValue);
+                  emit("change", parsedValue);
+                }
+              } catch (error) {
+                console.warn("JSON parse error:", error);
+                emit("error", error);
+              }
+            });
+          }
+
+          // 禁用编辑器（如果是只读模式）
+          if (props.readOnly) {
+            if (editor.aceEditor) {
+              editor.aceEditor.setReadOnly(true);
+              editor.aceEditor.renderer.setShowGutter(false);
+              editor.aceEditor.textInput.getElement().disabled = true;
+            }
+          }
 
           // 隐藏不需要的元素
-          const container = jsonEditorRef.value.editor.container;
+          const container = editor.container;
           const poweredBy = container.querySelector(".jsoneditor-poweredBy");
           const modes = container.querySelector(".jsoneditor-modes");
           if (poweredBy) poweredBy.style.display = "none";
@@ -109,7 +132,7 @@ export default {
       jsonEditorRef,
       localValue,
       editorOptions,
-      handleChange,
+      editorMode,
     };
   },
 };
@@ -120,7 +143,55 @@ export default {
   width: 100%;
 
   :deep(.jsoneditor-vue) {
-    height: v-bind("height") !important;
+    height: v-bind("height + 'px'") !important;
+
+    .jsoneditor {
+      border: none;
+    }
+
+    .ace-jsoneditor {
+      min-height: 100%;
+    }
+
+    .ace_editor {
+      min-height: 100%;
+    }
+
+    .ace_content {
+    }
+
+    .ace_scroller {
+      min-width: 100%;
+      overflow: auto !important;
+
+      &::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+
+      &::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+
+      &::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+      }
+
+      &::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+    }
+
+    .ace_print-margin {
+      display: none !important;
+    }
+
+    // 确保文本不会被截断
+    .ace_line {
+      white-space: pre !important;
+      width: max-content !important;
+    }
   }
 }
 </style> 

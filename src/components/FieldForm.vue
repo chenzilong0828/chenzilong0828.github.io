@@ -13,7 +13,7 @@
         <el-option label="数字" value="number" />
         <el-option label="字符串" value="string" />
         <el-option label="布尔值" value="boolean" />
-        <el-option label="JSON" value="json" />
+        <!-- <el-option label="JSON" value="json" /> -->
       </el-select>
     </el-form-item>
 
@@ -25,13 +25,27 @@
           @change="handleJsonChange"
         />
       </template>
+      <el-input-number
+        v-else-if="form.type === 'number'"
+        v-model="form.value"
+        :controls="true"
+        placeholder="请输入数字"
+      />
+      <el-select
+        v-else-if="form.type === 'boolean'"
+        v-model="form.value"
+        placeholder="请选择布尔值"
+      >
+        <el-option :label="'true'" :value="true" />
+        <el-option :label="'false'" :value="false" />
+      </el-select>
       <el-input v-else v-model="form.value" placeholder="字段值" />
     </el-form-item>
   </el-form>
 </template>
 
 <script>
-import { defineComponent, computed } from "vue";
+import { defineComponent, computed, watch } from "vue";
 import CustomJsonEditor from "./JsonEditor.vue";
 
 export default defineComponent({
@@ -44,6 +58,10 @@ export default defineComponent({
       type: Object,
       required: true,
     },
+    rules: {
+      type: Object,
+      default: () => ({}),
+    },
     jsonEditorHeight: {
       type: String,
       default: "200px",
@@ -55,6 +73,28 @@ export default defineComponent({
       get: () => props.modelValue,
       set: (value) => emit("update:modelValue", value),
     });
+
+    // 监听类型变化，更新字段值
+    watch(
+      () => form.value.type,
+      (newType) => {
+        let defaultValue;
+        switch (newType) {
+          case "number":
+            defaultValue = 0;
+            break;
+          case "boolean":
+            defaultValue = false;
+            break;
+          case "json":
+            defaultValue = {};
+            break;
+          default:
+            defaultValue = "";
+        }
+        form.value = { ...form.value, value: defaultValue };
+      }
+    );
 
     const handleJsonChange = (value) => {
       emit("change", value);

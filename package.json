@@ -9,13 +9,15 @@
     "deploy": "deploy.bat"
   },
   "dependencies": {
+    "axios": "^1.7.9",
+    "cheerio": "^1.0.0",
     "core-js": "^3.8.3",
     "element-plus": "^2.9.3",
-    "gsap": "^3.12.5",
-    "mouse-follower": "^1.1.2",
-    "particles.js": "^2.0.0",
+    "md5": "^2.3.0",
+    "uuid": "^11.1.0",
     "vue": "^3.2.13",
-    "vue-json-editor": "^1.4.3"
+    "vue-json-editor": "^1.4.3",
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
     "@babel/core": "^7.12.16",
@@ -47,5 +49,10 @@
     "last 2 versions",
     "not dead",
     "not ie 11"
-  ]
+  ],
+  "main": "babel.config.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
 }
